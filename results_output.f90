@@ -18,10 +18,9 @@
 !    You should have received a copy of the GNU General Public License
 !    along with HydroSed2D.  If not, see <http://www.gnu.org/licenses/>.
 !
-!  Base on HydroSed2D, Mingliang Zhang and Hongxing Zhang further developed the depth-averaged 2D hydrodynamic model 
-!  by introducing treatment technology of wet-dry boundary. 
+!    Base on HydroSed2D, Mingliang Zhang and Hongxing Zhang further developed the depth-averaged 2D hydrodynamic model 
+!    by introducing treatment technology of wet-dry boundary and considering vegetation effects. 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
 !c***************************************************************
 	subroutine results_output
 	USE COMMON_MODULE,ONLY: Q1,Q2,Q3,dirname,tempfilename,nStep,nodecsed,&
@@ -37,17 +36,7 @@
 	if((mod(nStep,nDeltaT_output).eq.0).or.(nStep.eq.0)) then
 		WRITE(UNIT=STRING, FMT='(I5)') int(nStep/nDeltaT_output)
 
-		!write cell center variables
-!		tempfilename=trim(trim(trim(dirname) // '\results\phi' // adjustl(STRING)) // '.dat')
-!		open(unit=9,file=tempfilename,status='unknown')
 
-!		write(9,*) 'VARIABLES = "X", "Y", "Z", "phi1","phi2","phi3"'
-
-!		do i=1,nFaces
-!			write(9,*) faceCenters(i,1),faceCenters(i,2),faceCenters(i,2),&
-!					   faceLimiters(i,1),faceLimiters(i,2),faceLimiters(i,3)
-!		end do
-!		close(9)
 
 		!interpolate cell center data to nodes
 		call cellCenterToNodes(Sox,nodeSox)
@@ -80,11 +69,11 @@
 		do i=1,nNodes
 			if(pointMarkers(i).eq.1) then   !internal point
 				write(9, *) pcoor(i,1), pcoor(i,2), pcoor(i,3), nodeZSurf(i), nodeQ1(i),&
-					        nodeU(i), nodeV(i), dsqrt(nodeU(i)**2+nodeV(i)**2), nodecsed(i), &     ! nodeElevationChange(i),
+					        nodeU(i), nodeV(i), dsqrt(nodeU(i)**2+nodeV(i)**2), nodecsed(i), &    
 							nodeSox(i), nodeSoy(i)
 			else                            !external point
 				write(9, *) pcoor(i,1), pcoor(i,2), pcoor(i,3), nodeZSurf(i), meanH,&
-					        meanU, meanV, dsqrt(meanU**2+meanV**2), meanC,  '0 ','0'           !' 0.0 ',
+					        meanU, meanV, dsqrt(meanU**2+meanV**2), meanC,  '0 ','0'           
 			end if
 		enddo
 

@@ -18,8 +18,8 @@
 !    You should have received a copy of the GNU General Public License
 !    along with HydroSed2D.  If not, see <http://www.gnu.org/licenses/>.
 !
-!  Base on HydroSed2D, Mingliang Zhang and Hongxing Zhang further developed the depth-averaged 2D hydrodynamic model 
-!  by introducing treatment technology of wet-dry boundary. 
+!    Base on HydroSed2D, Mingliang Zhang and Hongxing Zhang further developed the depth-averaged 2D hydrodynamic model 
+!    by introducing treatment technology of wet-dry boundary and considering vegetation effects. 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 !   Initialization
@@ -77,7 +77,7 @@
 	read(8,*)string
 	read(8,*)terraindeal,termax,termin
 	read(8,*)string
-	read(8,*)terrainfile              !terrainfile is a local variable
+	read(8,*)terrainfile             
 	read(8,*)string
 	read(8,*)meshType
 	read(8,*)string
@@ -162,7 +162,7 @@
 		b=0.0D0
 		d=0.0D0
 	else
-		a=1.0D0 
+		a=1.0D0
 		b=0.0D0 
 		d=0.0D0    
 	end if
@@ -196,24 +196,22 @@
 	sedweight0=0
 	ttemp=0.0
 
-!	call get_input_qtotal(ttemp,initq)
-!	call from_q_get_h(initq,initz)
 
 
 
 
 	do i=1,nFaces	      
 		nb(i)=zaolv
-      if(faceCenters(i,3).lt.0.135) then
-        Q1(i)=0.135-faceCenters(i,3)
-	    Q2(i)=0.0D0								
+     if(faceCenters(i,3).lt.0.12) then
+        Q1(i)=0.12-faceCenters(i,3)
+	    Q2(i)=0.0D0								 
 	    Q3(i)=0.0D0	
-  	 else	
-	     Q1(i)=0.0 
-	      Q2(i)=0.0D0							
+	   else	
+	     Q1(i)=0.0  
+	     Q2(i)=0.0D0								
 	     Q3(i)=0.0D0	
-     endif
-    
+ 	endif
+     
 	
 
 		if(Q1(i)<=drydeep)then	
