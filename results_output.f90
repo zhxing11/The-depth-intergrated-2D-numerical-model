@@ -15,17 +15,13 @@
 !    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 !    GNU General Public License for more details.
 !
-!    You should have received a copy of the GNU General Public License
-!    along with HydroSed2D.  If not, see <http://www.gnu.org/licenses/>.
-!
-!  Base on HydroSed2D, Mingliang Zhang and Hongxing Zhang further developed the depth-averaged 2D hydrodynamic model 
-!  by introducing treatment technology of wet-dry boundary. 
+!    Base on HydroSed2D, Mingliang Zhang and Hongxing Zhang further developed the depth-averaged 2D hydrodynamic model 
+!    by introducing treatment technology of wet-dry boundary. 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
 !c***************************************************************
 	subroutine results_output
-	USE COMMON_MODULE,ONLY: Q1,Q2,Q3,dirname,tempfilename,nStep,nodecsed,&
-							faceCenters,nDeltaT_output,eta,UM,VN,nodeU,meanC,&
+	USE COMMON_MODULE,ONLY: Q1,Q2,Q3,dirname,tempfilename,nStep,&
+							faceCenters,nDeltaT_output,eta,UM,VN,nodeU,&
 							nodeV,facePoints,nNodes,nFaces,pcoor,pointMarkers,&
 							meanH,meanU,meanV,nodeZSurf,faceEdgesNum,ELEDGES,faceLimiters,&
 							nodeElevationChange,Sox,Soy,nodeSox,nodeSoy,platform,nodeQ1
@@ -67,7 +63,7 @@
 		open(unit=9,file=tempfilename,status='unknown')
 
  	    write(9,*) 'TITLE = SWE Solver Water Surface Elevation'
-		write(9,*) 'VARIABLES = "X", "Y", "Z", "Zsurf","H", "U", "V", "Umag","C","deltaZ","Sox","Soy"'
+		write(9,*) 'VARIABLES = "X", "Y", "Z", "Zsurf","H", "U", "V", "Umag","deltaZ","Sox","Soy"'
 
 		if(ELEDGES.eq.3) then
 			write(9, *) 'ZONE, DATAPACKING=POINT, N=', nNodes, ',E=', &
@@ -79,13 +75,14 @@
 
 		do i=1,nNodes
 			if(pointMarkers(i).eq.1) then   !internal point
-				write(9, *) pcoor(i,1), pcoor(i,2), pcoor(i,3), nodeZSurf(i), nodeQ1(i),&
-					        nodeU(i), nodeV(i), dsqrt(nodeU(i)**2+nodeV(i)**2), nodecsed(i), &     ! nodeElevationChange(i),
-							nodeSox(i), nodeSoy(i)
+				write(9, *) pcoor(i,1), pcoor(i,2), pcoor(i,3), nodeZSurf(i),nodeQ1(i),&
+					        nodeU(i), nodeV(i), dsqrt(nodeU(i)**2+nodeV(i)**2), nodeElevationChange(i),&
+							nodeSox(i),nodeSoy(i)
 			else                            !external point
-				write(9, *) pcoor(i,1), pcoor(i,2), pcoor(i,3), nodeZSurf(i), meanH,&
-					        meanU, meanV, dsqrt(meanU**2+meanV**2), meanC,  '0 ','0'           !' 0.0 ',
+				write(9, *) pcoor(i,1), pcoor(i,2), pcoor(i,3), nodeZSurf(i),meanH,&
+					        meanU, meanV, dsqrt(meanU**2+meanV**2), ' 0.0 ', '0 ','0'
 			end if
+
 		enddo
 
 	    do i=1,nFaces

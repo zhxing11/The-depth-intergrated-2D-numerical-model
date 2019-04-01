@@ -11,7 +11,7 @@
     implicit none
 	real*8 timestart,timestop,timetotal
 
-	
+
 	write(*,*) '-------------------------------------------------------------------'
     write(*,*) '|   Shallow    | HydroSed2D: Shallow Water Equation with Sediment |'
 	write(*,*) '|   Water      |                                                  |'
@@ -40,28 +40,22 @@
 
 
 !-------------read input water level data
-	  open(2,FILE='input/h.dat',STATUS='UNKNOWN')
-	    do aa=1,nDEMPoints
-   	     read(2,*) wse(aa,1),wse(aa,2)
-		 enddo
 
-	  close(2)
-     
 	!calculation
 	do while (t <= tstop) 
 		write(*,*) 't = ', t, ' s out of ', tstop, 's' 
 		nStep=nStep+1
 
-		call swe
-	    	
-
+		call swe		
 		call results_output
-    
-	 if(mod(nstep,250).eq.0)write(111,*) t, eta(22554)  
-	 if(mod(nstep,250).eq.0)write(112,*) t, eta(3225)  
-	 if(mod(nstep,250).eq.0)write(113,*) t, eta(5426)
 
-		t=t+dt
+        if(mod(nstep,100).eq.0)write(11,*) t, Q1(15473) !P1
+        if(mod(nstep,100).eq.0)write(12,*) t, Q1(13018)!P2
+		if(mod(nstep,100).eq.0)write(13,*) t, Q1(12942)!P3
+        if(mod(nstep,100).eq.0)write(14,*) t, Q1(12867)!P4
+		if(mod(nstep,100).eq.0)write(15,*) t, Q1(11071)!P5
+        if(mod(nstep,100).eq.0)write(16,*) t, Q1(15247)!P6
+	    t=t+dt
 
 		tscount=tscount+1
 		if(tscount==sedInterval)then
