@@ -113,22 +113,8 @@ SOURCE=.\module.f90
 # End Source File
 # Begin Source File
 
-SOURCE=.\readGambitMesh.f90
-NODEP_F90_READG=\
-	".\Debug\COMMON_MODULE.mod"\
-	
-# End Source File
-# Begin Source File
-
 SOURCE=.\readGMSHMesh.f90
-NODEP_F90_READGM=\
-	".\Debug\COMMON_MODULE.mod"\
-	
-# End Source File
-# Begin Source File
-
-SOURCE=.\restart_output.f90
-NODEP_F90_RESTA=\
+NODEP_F90_READG=\
 	".\Debug\COMMON_MODULE.mod"\
 	
 # End Source File
