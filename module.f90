@@ -18,8 +18,8 @@
 !    You should have received a copy of the GNU General Public License
 !    along with HydroSed2D.  If not, see <http://www.gnu.org/licenses/>.
 !
-!    Base on HydroSed2D, Mingliang Zhang and Hongxing Zhang further developed the depth-averaged 2D hydrodynamic model 
-!    by introducing treatment technology of wet-dry boundary and considering vegetation effects. 
+!  Base on HydroSed2D, Mingliang Zhang and Hongxing Zhang further developed the depth-averaged 2D hydrodynamic model 
+!    by introducing treatment technology of wet-dry boundary. 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 MODULE  COMMON_MODULE 
@@ -29,8 +29,8 @@ MODULE  COMMON_MODULE
 
         integer*4 maxnodes_, maxedges_, maxfaces_, maxboundaryedges_,&
 				  maxboundarypoints_,maxnodefaces_
-        parameter(maxnodes_ = 20000, maxedges_ = 60000, maxfaces_ = 60000, &
-		          maxboundaryedges_ = 50000,maxboundarypoints_=10000,maxnodefaces_=10)
+        parameter(maxnodes_ = 35000, maxedges_ = 120000, maxfaces_ = 70000, &
+		          maxboundaryedges_ = 800,maxboundarypoints_=2000,maxnodefaces_=15)
 
 		integer*4 ELEDGES       !maximum edges for each cell
 		parameter(ELEDGES=3)
@@ -317,6 +317,6 @@ MODULE  COMMON_MODULE
 		integer*4 nStep
 	    integer*4 ISTAT
 	    integer aa
-		integer, parameter::nDEMPoints=4636
+		integer, parameter::nDEMPoints=157
 		real*8 wse(nDEMPoints,3)
 END MODULE  COMMON_MODULE 
