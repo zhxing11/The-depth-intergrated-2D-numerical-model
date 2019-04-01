@@ -15,13 +15,16 @@
 !    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 !    GNU General Public License for more details.
 !
+!    You should have received a copy of the GNU General Public License
+!    along with HydroSed2D.  If not, see <http://www.gnu.org/licenses/>.
+!
 !    Base on HydroSed2D, Mingliang Zhang and Hongxing Zhang further developed the depth-averaged 2D hydrodynamic model 
-!    by introducing treatment technology of wet-dry boundary. 
+!    by introducing treatment technology of wet-dry boundary and considering vegetation effects. 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !c***************************************************************
 	subroutine results_output
-	USE COMMON_MODULE,ONLY: Q1,Q2,Q3,dirname,tempfilename,nStep,&
-							faceCenters,nDeltaT_output,eta,UM,VN,nodeU,&
+	USE COMMON_MODULE,ONLY: Q1,Q2,Q3,dirname,tempfilename,nStep,nodecsed,&
+							faceCenters,nDeltaT_output,eta,UM,VN,nodeU,meanC,&
 							nodeV,facePoints,nNodes,nFaces,pcoor,pointMarkers,&
 							meanH,meanU,meanV,nodeZSurf,faceEdgesNum,ELEDGES,faceLimiters,&
 							nodeElevationChange,Sox,Soy,nodeSox,nodeSoy,platform,nodeQ1
@@ -33,17 +36,7 @@
 	if((mod(nStep,nDeltaT_output).eq.0).or.(nStep.eq.0)) then
 		WRITE(UNIT=STRING, FMT='(I5)') int(nStep/nDeltaT_output)
 
-		!write cell center variables
-!		tempfilename=trim(trim(trim(dirname) // '\results\phi' // adjustl(STRING)) // '.dat')
-!		open(unit=9,file=tempfilename,status='unknown')
 
-!		write(9,*) 'VARIABLES = "X", "Y", "Z", "phi1","phi2","phi3"'
-
-!		do i=1,nFaces
-!			write(9,*) faceCenters(i,1),faceCenters(i,2),faceCenters(i,2),&
-!					   faceLimiters(i,1),faceLimiters(i,2),faceLimiters(i,3)
-!		end do
-!		close(9)
 
 		!interpolate cell center data to nodes
 		call cellCenterToNodes(Sox,nodeSox)
@@ -63,7 +56,7 @@
 		open(unit=9,file=tempfilename,status='unknown')
 
  	    write(9,*) 'TITLE = SWE Solver Water Surface Elevation'
-		write(9,*) 'VARIABLES = "X", "Y", "Z", "Zsurf","H", "U", "V", "Umag","deltaZ","Sox","Soy"'
+		write(9,*) 'VARIABLES = "X", "Y", "Z", "Zsurf","H", "U", "V", "Umag","C","deltaZ","Sox","Soy"'
 
 		if(ELEDGES.eq.3) then
 			write(9, *) 'ZONE, DATAPACKING=POINT, N=', nNodes, ',E=', &
@@ -75,14 +68,13 @@
 
 		do i=1,nNodes
 			if(pointMarkers(i).eq.1) then   !internal point
-				write(9, *) pcoor(i,1), pcoor(i,2), pcoor(i,3), nodeZSurf(i),nodeQ1(i),&
-					        nodeU(i), nodeV(i), dsqrt(nodeU(i)**2+nodeV(i)**2), nodeElevationChange(i),&
-							nodeSox(i),nodeSoy(i)
+				write(9, *) pcoor(i,1), pcoor(i,2), pcoor(i,3), nodeZSurf(i), nodeQ1(i),&
+					        nodeU(i), nodeV(i), dsqrt(nodeU(i)**2+nodeV(i)**2), nodecsed(i), &    
+							nodeSox(i), nodeSoy(i)
 			else                            !external point
-				write(9, *) pcoor(i,1), pcoor(i,2), pcoor(i,3), nodeZSurf(i),meanH,&
-					        meanU, meanV, dsqrt(meanU**2+meanV**2), ' 0.0 ', '0 ','0'
+				write(9, *) pcoor(i,1), pcoor(i,2), pcoor(i,3), nodeZSurf(i), meanH,&
+					        meanU, meanV, dsqrt(meanU**2+meanV**2), meanC,  '0 ','0'           
 			end if
-
 		enddo
 
 	    do i=1,nFaces

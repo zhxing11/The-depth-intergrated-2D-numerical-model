@@ -11,8 +11,7 @@
     implicit none
 	real*8 timestart,timestop,timetotal
 
-
-	write(*,*) '-------------------------------------------------------------------'
+    write(*,*) '-------------------------------------------------------------------'
     write(*,*) '|   Shallow    | HydroSed2D: Shallow Water Equation with Sediment |'
 	write(*,*) '|   Water      |                                                  |'
 	write(*,*) '|   Equation   |    by     : Xiaofeng Liu, Hydrosystems Lab, UIUC |'
@@ -24,7 +23,8 @@
 	write(*,*) '--------------------------------------------------------------------'
     write(*,*) '|Base on HydroSed2D£¬Mingliang Zhang and Hongxing Zhang further     |'
 	write(*,*) '|developed the depth-averaged 2D hydrodynamic model by introducing  |'
-    write(*,*) '|treatment technology of wet-dry boundary                           |'                                                                                                          
+    write(*,*) '|treatment technology of wet-dry boundary and considering vegetation|'       
+	write(*,*) '|effects.                                                           |'                                           
 	write(*,*) '|Mingliang Zhang (zhmliang_mail@126.com);                           |'
 	write(*,*) '|Hongxing Zhang (zhxing611@163.com)                                 |'
 	write(*,*) '|School of Ocean Science and Environment, Dalian Ocean University   |'
@@ -40,22 +40,32 @@
 
 
 !-------------read input water level data
-
+  open(2,FILE='input/eta.11',STATUS='UNKNOWN')
+   	     do aa=1,nDEMPoints
+		 read(2,*) wse(aa,1),wse(aa,2)
+       	 enddo
+	  close(2)
+     
 	!calculation
 	do while (t <= tstop) 
 		write(*,*) 't = ', t, ' s out of ', tstop, 's' 
 		nStep=nStep+1
 
-		call swe		
+		call swe
+	    	
+
+		
 		call results_output
 
-        if(mod(nstep,100).eq.0)write(11,*) t, Q1(15473) !P1
-        if(mod(nstep,100).eq.0)write(12,*) t, Q1(13018)!P2
-		if(mod(nstep,100).eq.0)write(13,*) t, Q1(12942)!P3
-        if(mod(nstep,100).eq.0)write(14,*) t, Q1(12867)!P4
-		if(mod(nstep,100).eq.0)write(15,*) t, Q1(11071)!P5
-        if(mod(nstep,100).eq.0)write(16,*) t, Q1(15247)!P6
-	    t=t+dt
+        
+	  
+	 if(mod(nstep,1).eq.0)write(10,*) t, faceCenters(23909,1),(eta(23909)-0.12)*100   !G2
+     if(mod(nstep,1).eq.0)write(11,*) t, faceCenters(17919,1),(eta(17919)-0.12)*100   !G4 
+	 if(mod(nstep,1).eq.0)write(14,*) t, faceCenters(28701,1),(eta(28701)-0.12)*100   !G5 
+	 if(mod(nstep,1).eq.0)write(17,*) t, faceCenters(15778,1),(eta(15778)-0.12)*100   !G6 
+	
+	 
+		t=t+dt
 
 		tscount=tscount+1
 		if(tscount==sedInterval)then

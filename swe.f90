@@ -1,4 +1,4 @@
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    HydroSed2D Copyright (C) 2008 Xiaofeng Liu
 !
 !    License
@@ -15,6 +15,9 @@
 !    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 !    GNU General Public License for more details.
 !
+!    You should have received a copy of the GNU General Public License
+!    along with HydroSed2D.  If not, see <http://www.gnu.org/licenses/>.
+!
 !    Base on HydroSed2D, Mingliang Zhang and Hongxing Zhang further developed the depth-averaged 2D hydrodynamic model 
 !    by introducing treatment technology of wet-dry boundary and considering vegetation effects. 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -24,22 +27,25 @@
 	USE COMMON_MODULE
 	implicit none
     
-	integer i,j,k,mm,o,w,GHOSTCELL
-	real*8 hI,UI,VI,HB,UB
+	integer i,j,k,mm,o,w
+	integer*4 dryindex,wetindex
+	real*8  Q1FN,EtaFN
 	character*20 temp
 	character*14 tem
-    integer NoUse
-	integer*4 dryindex,wetindex
-	real*8 Q1FN,etaFN
-	
+    integer NoUse	
+
+    if(inctr==3) then !fixed q for inlet 
+
+		 call inputcells_q_calc()               
+	end if
     !estimate the wet or dry for each edge
     call wetdry_edge
 
     !chang eta
-	call change_eta
-    call cellCenterToNodes(eta,nodeZsurf)
-    call change_z
-    call updateMeshData2
+!	call change_eta
+   ! call cellCenterToNodes(eta,nodeZsurf)
+   ! call change_z
+   ! call updateMeshData
 
 	!calculate the gradient of Q at cell centers
 	call gradientQ
@@ -47,7 +53,7 @@
 	!calculate the gradient of u and v at cell centers
 	call gradientUV
 	call edgeGradientUV
-	
+
 	!calculate the gradient of eta at cell centers
 	call gradientEta
 
@@ -74,49 +80,47 @@
     
    enddo 
 !****************************************************
+	do  i=1,nFaces
 
-    do 114 i=1,nFaces
-	    
-		curFace=i
-
+     curFace=i     
 	   if(calc_flag(i)==1.or.calc_flag(i)==2)then
+   					
 			call border_values  !calculate border values
+	   endif
 
-		end if
-		
+
 		if(Q1(i)<=mindeep)then
 				Q1(i)=mindeep
 				do j=1,faceEdgesNum(i)		
 					Qb1(i,j)=Q1(i)
 				end do
 		end if
-
-114	end do
+	end do
     
+
+	
+	
+	
+	
 	!calculate the water depth Q1 at each edge
+
 	call calc_edgeQ1
 
 	do i=1,nFaces	
 		
 		curFace=i
-		
+
 		if(calc_flag(i)==1.or.calc_flag(i)==2)then
 			call border_averages
-        endif
-	enddo
-
-	do i=1,nFaces	
-		
-		curFace=i		
-		if(calc_flag(i)==1.or.calc_flag(i)==2)then
-		    call lambda_calc
+			call lambda_calc
 			call R_calc
 			call L_calc
 			call modA_calc
 			call FI_of_Qb_calc
 			call HiVi_calc
-		end if
+       endif
 	end do
+
 
 	do i=1,nFaces
 		
@@ -124,7 +128,7 @@
 
 		if(calc_flag(i)==1.or.calc_flag(i)==2)then
 			call FI_calc
-		!	call FV_calc
+			call FV_calc        
 			call FdotN_calc
 			call RofQi_calc
 		end if
@@ -135,7 +139,6 @@
 	do 115 i=1,nFaces
 
 		curFace=i
-
 
 		if(calc_flag(i)==1.or.calc_flag(i)==2)then
 			call integrate
@@ -148,14 +151,22 @@
 			if(Q1(i)<=drydeep)then	
 				UM(i)=0
 				VN(i)=0
-				eta(i)=faceCenters(i,3)
+               eta(i)=faceCenters(i,3)+drydeep  
 			else
 				UM(i)=Q2(i)/Q1(i)
 				VN(i)=Q3(i)/Q1(i)
 				eta(i)=faceCenters(i,3)+Q1(i)
 			end if
-		
-		end if
+
+	
+      else
+	     Q2(i)=0
+	 	 Q3(i)=0
+		 UM(i)=0
+		 VN(i)=0
+         eta(i)=faceCenters(i,3)+drydeep
+	endif
+	      
 
 115	end do
 
@@ -184,7 +195,7 @@
 !c  calculate the inlet flow rate per unit width for each inlet cell   
 	subroutine inputcells_q_calc()
 	USE COMMON_MODULE,ONLY: inputcellno,inputcelli,inputcellq,edgeMarkers,&
-	                        faceEdges,edgeLength,t,faceEdgesNum
+	                        faceEdges,edgeLength,t,faceEdgesNum,faceCenters
 
 	implicit none
 	integer i,j
@@ -194,11 +205,11 @@
 	real*8 inputq
 	integer NoUse
 	
-	call get_input_qtotal(t,inputq)
+!	call get_input_qtotal(t,inputq)
 
-	qalpha=1.0/inputcellno
+!	qalpha=1.0/inputcellno
 
-	do i=1,inputcellno
+		do i=1,inputcellno
 		dl=-1
 	    !find the length of the inlet side of current cell
 		do j=1,faceEdgesNum(i)
@@ -211,8 +222,14 @@
 			write(*,*) 'Error on the inlet cells'			
 			stop
 		endif
+        
+		if(faceCenters(inputcelli(i),1).gt.406150)then
+		    inputcellq(i)=57/3.0/dl
 
-		inputcellq(i)=qalpha(i)*inputq/dl
+		else
+            inputcellq(i)=101/2.0/dl
+		endif
+
 	end do
 
 	end subroutine
@@ -238,21 +255,21 @@
 	real*8 inq,int,intt
 
 	!not implemented yet. For now, just uniform distribution
-	inq = 0.1
+	inq = 101
 
  403	end subroutine
 
 !c********************************************************************
 !c  get inlet q for cell ii
-	subroutine get_inputcell_q(ii,Q2temp)
+	subroutine get_inputcell_q(ii,temp)
 	USE COMMON_MODULE,ONLY: inputcellno,inputcelli,inputcellq
 	implicit none
 	integer ii,j
-	real*8 Q2temp
+	real*8 temp
 
 	do j=1,inputcellno
 		if(ii==inputcelli(j))then
-			Q2temp=inputcellq(j)
+			temp=inputcellq(j)
 			goto 404
 		end if
 	end do	
@@ -278,7 +295,7 @@
 	real*8 temp2,temp3,temp1
 	real*8 Umax,Uvec,Upar,Vpar,Upar2,Vpar2,Uscale
 	real*8 stemp,ddt,wsl,Hmax,Htemp
-
+   
 	Q1(curFace)=Q1(curFace)+((dt/face2DArea(curFace))*((a*Rem1(curFace))+(b*oldRem1(curFace))))
 	Q2(curFace)=Q2(curFace)+((dt/face2DArea(curFace))*((a*Rem2(curFace))+(b*oldRem2(curFace))))       
 	Q3(curFace)=Q3(curFace)+((dt/face2DArea(curFace))*((a*Rem3(curFace))+(b*oldRem3(curFace)))) 
@@ -298,6 +315,7 @@
     
 	Q1(curFace)=max(Q1(curFace),drydeep)
    
+    
 	return
 	end
 
@@ -310,13 +328,18 @@
 	integer*4 j
 
 	do j=1,faceEdgesNum(curFace)
-		if(binfo(curFace,j)==4)then      !internal edge
+
+		if(binfo(curFace,j)==4)then      
+
 			call bvalue_calc1(curFace,j)
+
 		else
-			call bvalue_calc2(curFace,j) !boundary edge
-			call gbvalue_calc(curFace,j) !for ghost cell
+			call bvalue_calc2(curFace,j) 
+			call gbvalue_calc(curFace,j) 
+
 		end if
 	end do
+
 
     return
 	end
@@ -357,9 +380,9 @@
 	!unlimited value
 	Qedge=Q1(i) + temp
 	
-	Etab(i,j)=Eta(i) + etaLimiter(i)*temp
-	Qb1(i,j)= Q1(i)    !Etab(i,j) - edgeCenterCoor(faceEdges(i,j),3)
-
+	Etab(i,j)=Eta(i)  + etaLimiter(i)*temp
+	Qb1(i,j)=Etab(i,j) - edgeCenterCoor(faceEdges(i,j),3)
+   
 
 	!gradQ2
 	gradTemp(1)=gradQ2(i,1)
@@ -370,7 +393,7 @@
 	Qedge=Q2(i) + temp
 
 	Qb2(i,j)=Q2(i) + faceLimiters(i,2)*temp
-	
+
 
 	!gradQ3
 	gradTemp(1)=gradQ3(i,1)
@@ -381,14 +404,15 @@
 	Qedge=Q3(i) + temp
 
 	Qb3(i,j)=Q3(i) + faceLimiters(i,3)*temp
-	
+!----------------------------------------------------------	
      curEdge = faceEdges(i, j)
 			 
-      if(edgedrywet(curEdge)==0)then
-        Qb1(i,j)=drydeep
-        Qb2(i,j)=0.0
-	    Qb3(i,j)=0.0
-	  endif	
+    if(edgedrywet(curEdge)==0)then
+       Qb1(i,j)=drydeep
+       Qb2(i,j)=0.0
+	   Qb3(i,j)=0.0
+	endif
+
 	else
 	 Qb1(i,j)=drydeep
 	 Qb2(i,j)=0.0
@@ -396,7 +420,6 @@
 	endif
 
 	end subroutine
-	
 	
 !c***************************************************************
 	subroutine bvalue_calc2(i,j)
@@ -410,11 +433,10 @@
 	real*8 uB,uI,hI,hB
 	
 	!piecewise constant interpolation for boundary direction edge
+	Qb1(i,j)=Q1(i) 
+	Qb2(i,j)=Q2(i)
+	Qb3(i,j)=Q3(i)
 
-       Qb1(i,j)=Q1(i) 
-	   Qb2(i,j)=Q2(i)
-	   Qb3(i,j)=Q3(i)
-  
     end subroutine
 
 !****************************************************************
@@ -422,18 +444,25 @@
 	subroutine gbvalue_calc(i,j)
 	USE COMMON_MODULE,ONLY:Qb1,Qb2,Qb3,Q1,Q2,Q3,binfo,mindeep, &
 	                       g,inctr,outctr,gQb1,gQb2,gQb3,faceEdges,&
-						   boundaryEdgeGhostCells,faceCenters,&
+						   boundaryEdgeGhostCells,faceCenters,csed,gcsed,&
 						   inletH,inletUB,inletVB,inletQ,outletH,&
-						   outletUB,outletVB,outletQ,gQ1,gQ2,gQ3
+						   outletUB,outletVB,outletQ,gQ1,gQ2,gQ3,faceEdgeNormals,&
+	                       aa,nDEMPoints,wse,t
 	implicit none
 	integer i,j,k,ghostCell
-	real*8 Q1FN,Q2FN,Q3FN,Q1tmp,Q2tmp,Q3tmp
+	real*8 Q1FN,Q2FN,Q3FN,Q1tmp,Q2tmp,Q3tmp,csedtmp,temp,temp1
 	real*8 phi1,phi2,phi3
-	real*8 uB,vB,uI,vI,hI,hB
+	real*8 uB,vB,uI,vI,hI,hB,UQt,h
 	real*8 qcondition_inlet
+	real*8 nx,ny
+	real*8 waterlevel
 
-	!get the ghost cell number
-	ghostCell=boundaryEdgeGhostCells(faceEdges(i,j))
+
+		!get the ghost cell number
+	ghostCell=boundaryEdgeGhostCells(faceEdges(i,j))    
+
+	nx=faceEdgeNormals(i,j,1)
+	ny=faceEdgeNormals(i,j,2)
 
 	hI=Qb1(i,j)
 	if(hI<=mindeep)then 	!mindeep-->0
@@ -443,113 +472,74 @@
 	uI=Qb2(i,j)/hI
 	vI=Qb3(i,j)/hI
 
-	if(binfo(i,j)==1)then              !inlet
-		if(inctr==1) then !given h
-			if(dabs(uI)/dsqrt(g*hI).lt.1) then !subcritical
-				hB=inletH
-				uB=-1*(-Qb2(i,j)/hI + 2*dsqrt(g)*(dsqrt(hI)-dsqrt(hB)))
-				Q1tmp = hB
-				Q2tmp = uB*hB
-				Q3tmp = vI*hB
-			else !supercritical
-				hB=inletH
-				uB=inletUB
-				vB=inletVB
-				Q1tmp = hB
-				Q2tmp = uB*hB
-				Q3tmp = vB*hB
-			endif
-		elseif(inctr==2) then  !given u
-			if(dabs(uI)/dsqrt(g*hI).lt.1) then !subcritical
-				uB=inletUB
-				hB=(1.0/2.0/dsqrt(g)*(uI-uB)+dsqrt(hI))**2
-				vB=vI
-				Q1tmp = hB
-				Q2tmp = uB*hB
-				Q3tmp = vB*hB
-			else !supercritical
-				hB=inletH
-				uB=inletUB
-				vB=inletVB
-				Q1tmp = hB
-				Q2tmp = uB*hB
-				Q3tmp = vB*hB
-			endif
-		elseif(inctr==3) then  !given q
-			!call get_inputcell_q(i,Q2tmp)          
-			Q2tmp=inletQ
+	UQt=uI*nx+vI*ny
 
-			if(Q2tmp>0)then
-				if((Q2tmp/dsqrt(g*hI)/hI).lt.1) then !subcritical					
-					hB=inletH !qcondition_inlet(uI,hI,Q2tmp)
-					Q1tmp=hB
-					Q3tmp=vI*hB
-				else                                 !supercritical
-					write(*,*) 'Supercritical inlet'
-					hB=inletH
-					vB=inletVB
-					Q1tmp = hB
-					Q3tmp = vB*hB
-				end if
-			else
-				Q1tmp=Qb1(i,j)
-				Q3tmp=Qb3(i,j)  
-			end if
-		else
-			write(*,*) 'Inlet condition not supported!'
-			stop
-		end if
-
-		gQb1(ghostCell)=Q1tmp
-		gQb2(ghostCell)=Q2tmp
-		gQb3(ghostCell)=Q3tmp
-
-	elseif(binfo(i,j)==2)then   !outlet
-		if(outctr==1) then !given h
-			if(dabs(uI)/dsqrt(g*hI).lt.1) then !subcritical
+	if(binfo(i,j)==1)then
+     
+			call get_inputcell_q(i,temp) 
 			
-				hB=outletH
-				uB=-1*(-Qb2(i,j)/hI + 2*dsqrt(g)*(dsqrt(hI)-dsqrt(hB)))
-				Q1tmp = hB
-				Q2tmp = Qb2(i,j)
-				Q3tmp = Qb3(i,j) 
-			else !supercritical
-				write(*,*) 'Supercritical outlet'
-				Q1tmp = Qb1(i,j)
-				Q2tmp = Qb2(i,j)
-				Q3tmp = Qb3(i,j)
-			endif
-		elseif(outctr==2) then  !given u
-			if(dabs(uI)/dsqrt(g*hI).lt.1) then !subcritical
-				uB=outletUB
-				hB=(1.0/2.0/dsqrt(g)*(uI-uB)+dsqrt(hI))**2
-				vB=vI
-				Q1tmp = hB
-				Q2tmp = uB*hB
-				Q3tmp = vB*hB
-			else !supercritical
-				Q1tmp = Qb1(i,j)
-				Q2tmp = Qb2(i,j)
-				Q3tmp = Qb3(i,j)
-			endif
-		elseif(outctr==3) then
-			Q1tmp = Qb1(i,j)
-			Q2tmp = Qb2(i,j)
-			Q3tmp = Qb3(i,j)
-		else
-			write(*,*) 'Outlet condition not supported!'
-			stop
-		end if
+			temp1=-1.0*temp       
+
+!			if(Q2tmp>0)then
+!				if((Q2tmp/dsqrt(g*hI)/hI).lt.1) then !subcritical					
+					hB=qcondition_inlet(UQt,hI,temp1)
+!					print*,hb,Qb1(i,j)
+!					pause
+					Q1tmp=hB
+                    Q2tmp=temp*(-nx)
+					Q3tmp=temp*(-ny)
+!print*,temp,Q2tmp,Q3tmp
+!				else                                 !supercritical
+!					write(*,*) 'Supercritical inlet'
+!					hB=inletH
+!					vB=inletVB
+!					Q1tmp = hB
+!					Q3tmp = vB*hB
+!				end if
+!			else
+!				Q1tmp=Qb1(i,j)
+!				Q3tmp=Qb3(i,j)  !0D0 
+!			end if
+		
 
 		gQb1(ghostCell)=Q1tmp
 		gQb2(ghostCell)=Q2tmp
 		gQb3(ghostCell)=Q3tmp
+      
+
+	 elseif(binfo(i,j)==2)then   
+       
+  	        do aa=1,nDEMPoints-1
+             if((wse(aa,1).le.t).and.(t.lt.wse(aa+1,1)))then
+               waterlevel=wse(aa,2)+(wse(aa+1,2)-wse(aa,2))/(wse(aa+1,1)-wse(aa,1))*(t-wse(aa,1))
+          
+			 endif
+		   enddo
+ 
+         hB=waterlevel+0.12
+	     uB=Qb2(i,j)/hI+2*dsqrt(g)*(dsqrt(hI)-dsqrt(hB))
+	     vB=Qb3(i,j)/hI+2*dsqrt(g)*(dsqrt(hI)-dsqrt(hB))
+
+
+	      if(uI.gt.0.0)then
+            gQb1(ghostCell)= hB  
+       	    gQb2(ghostCell)= hB*uB  
+		    gQb3(ghostCell)= 0  
+         
+	   else
+            gQb1(ghostCell)= Qb1(i,j)
+       	    gQb2(ghostCell)= Qb2(i,j)  
+		    gQb3(ghostCell)= 0  !
+         
+	     endif
+	   
 
 	elseif(binfo(i,j)==3)then   
-		gQb1(ghostCell)=Q1(i)
+
+		gQb1(ghostCell)=Q1(i)     
 		gQb2(ghostCell)=0.0D0
 		gQb3(ghostCell)=0.0D0
-
+     
 	else
 		write(*,*) 'Wrong!'
 		stop
@@ -559,7 +549,7 @@
 	gQ1(ghostCell)=gQb1(ghostCell)
 	gQ2(ghostCell)=gQb2(ghostCell)
 	gQ3(ghostCell)=gQb3(ghostCell)
-
+ 
 	end subroutine
 
 
@@ -575,17 +565,16 @@
 		g,curFace,faceEdgeNormals,Q1,Q2,Q3,drydeep,mindeep,&
 		scalc,sedInterval,t,dt,ts,td,sedimentctl,u,v,boundaryEdgeGhostCells,&
 		gFIofQb1,gFIofQb2,gFIofQb3,faceNeighbors,faceEdges,gQb1,&
-		edgeCenterCoor,faceEdgesNum,gQb2,gQb3,etab,geta
+		edgeCenterCoor,faceEdgesNum,gQb2,gQb3
 	implicit none
 	
 	integer j,ghostCell
 	real*8 infI1,infI2,infI3
 	real*8 gI1,gI2,gI3
-    real*8 guB,gvB,guI,gvI,ghI,ghB
 
 
 	do j=1,faceEdgesNum(curFace)
-		if(Qb1(curFace,j)<=mindeep)then	  
+		if(Qb1(curFace,j)<=drydeep)then	  
 			infI1=0.0
 			infI2=0.0 
 			infI3=0.0
@@ -594,24 +583,23 @@
 			gI3=0.0   
 		else
 			infI1=Qb2(curFace,j)
-			infI2=Qb2(curFace,j)**2/Qb1(curFace,j) +0.5*g*Qb1(curFace,j)**2   
+			infI2=Qb2(curFace,j)**2/Qb1(curFace,j)+0.5*g*Qb1(curFace,j)**2
 			infI3=Qb2(curFace,j)*Qb3(curFace,j)/Qb1(curFace,j)
 			gI1=Qb3(curFace,j)
 			gI2=infI3
-			gI3=Qb3(curFace,j)**2/Qb1(curFace,j) +0.5*g*Qb1(curFace,j)**2      
+			gI3=Qb3(curFace,j)**2/Qb1(curFace,j)+0.5*g*Qb1(curFace,j)**2
 	    end if
 	
-
 		FIofQb1(curFace,j)=(infI1*(faceEdgeNormals(curFace,j,1)))+(gI1*(faceEdgeNormals(curFace,j,2)))
 		FIofQb2(curFace,j)=(infI2*(faceEdgeNormals(curFace,j,1)))+(gI2*(faceEdgeNormals(curFace,j,2)))
 		FIofQb3(curFace,j)=(infI3*(faceEdgeNormals(curFace,j,1)))+(gI3*(faceEdgeNormals(curFace,j,2)))
 
-		!for ghost cells
-		if(faceNeighbors(curFace,j).lt.0) then !boundary cells
+	
+		if(faceNeighbors(curFace,j).lt.0) then 
 			ghostCell=boundaryEdgeGhostCells(faceEdges(curFace,j))
 
-          
-			if(gQb1(ghostCell)<=mindeep)then	  
+
+			if(gQb1(ghostCell)<=drydeep)then	  
 				infI1=0.0
 				infI2=0.0 
 				infI3=0.0
@@ -620,15 +608,13 @@
 				gI3=0.0   
 			else
 			infI1=gQb2(ghostCell)
-			infI2=gQb2(ghostCell)**2/gQb1(ghostCell) +0.5*g*gQb1(ghostCell)**2
+			infI2=gQb2(ghostCell)**2/gQb1(ghostCell)+0.5*g*gQb1(ghostCell)**2
 			infI3=gQb2(ghostCell)*gQb3(ghostCell)/gQb1(ghostCell)
 			gI1=gQb3(ghostCell)
 			gI2=infI3
-			gI3=gQb3(ghostCell)**2/gQb1(ghostCell) +0.5*g*gQb1(ghostCell)**2
+			gI3=gQb3(ghostCell)**2/gQb1(ghostCell)+0.5*g*gQb1(ghostCell)**2
 			end if
 
-			!here the minus sign in front of the edge normal vector is because the outside normal
-			!vector for the ghost cell is the opposite of the inside cell
 			gFIofQb1(ghostCell)=(infI1*(-faceEdgeNormals(curFace,j,1)))+(gI1*(-faceEdgeNormals(curFace,j,2)))
 			gFIofQb2(ghostCell)=(infI2*(-faceEdgeNormals(curFace,j,1)))+(gI2*(-faceEdgeNormals(curFace,j,2)))
 			gFIofQb3(ghostCell)=(infI3*(-faceEdgeNormals(curFace,j,1)))+(gI3*(-faceEdgeNormals(curFace,j,2)))
@@ -645,9 +631,8 @@
 !c      based on the cell centre values of consecutive cells.
 	subroutine FV_calc
 	USE COMMON_MODULE,ONLY: g,edgeGradU,edgeGradV,curFace,faceEdgeNormals,&
-							visc,drydeep,mindeep,&
-							edgeCenterCoor,faceEdges,Qb1av,FV2,FV3,faceEdgesNum,&
-							u,v,Q1
+							visc,drydeep,mindeep,QB1,nb,u,v,&
+							edgeCenterCoor,faceEdges,Qb1av,FV2,FV3,faceEdgesNum
 	implicit none
 
 	integer j,edgeNum
@@ -655,9 +640,12 @@
 	real*8 nx,ny
 	
 	do j=1,faceEdgesNum(curFace)
-	  visc=0.3*Q1(curFace)*dsqrt(u(curFace,j)**2+v(curFace,j)**2+0.00000000001)
-		if(visc>0)then
-    	  ht=Qb1av(curFace,j)		
+      if(Qb1(curFace,j)>drydeep)then
+	  
+	    visc=0.2*0.4*Qb1(curFace,j)*dsqrt((g*nb(curFace)**2*(u(curFace,j)**2+v(curFace,j)**2))/Qb1(curFace,j)**(1/3))	
+		
+    	  ht=Qb1av(curFace,j)
+		
 		  nx=faceEdgeNormals(curFace,j,1)
 		  ny=faceEdgeNormals(curFace,j,2)
 	
@@ -665,7 +653,7 @@
 
 		  FV2(curFace,j)=-visc*(ht*edgeGradU(edgeNum,1)*nx+ht*edgeGradU(edgeNum,2)*ny)
 		  FV3(curFace,j)=-visc*(ht*edgeGradV(edgeNum,1)*nx+ht*edgeGradV(edgeNum,2)*ny)
-		end if
+	  end if
 	end do
 
 	end subroutine
@@ -690,63 +678,75 @@
 	FdotN3(curFace)=0.0
 	do i=1,ELEDGES
 		FdotN1(curFace)=FdotN1(curFace)+FI1(curFace,i)*length(i)
-		FdotN2(curFace)=FdotN2(curFace)+(FI2(curFace,i))*length(i)  !+FV2(curFace,i)
-		FdotN3(curFace)=FdotN3(curFace)+(FI3(curFace,i))*length(i)  !+FV3(curFace,i)
+		FdotN2(curFace)=FdotN2(curFace)+(FI2(curFace,i)+0.0)*length(i)    
+		FdotN3(curFace)=FdotN3(curFace)+(FI3(curFace,i)+0.0)*length(i)   
+
 	end do
 
 	return       
 	end
-
 !c***************************************************************
 !c  This subroutine calculates the source term vector components
 	subroutine HiVi_calc
 	USE COMMON_MODULE,ONLY: maxfaces_,g,Q1,Q2,Q3,face2DArea,HiVi1,HiVi2,HiVi3,curFace,&
 		Sox,Soy,tauwx,tauwy,Swx,Swy,t,dt,ts,td,nb,frctl,drydeep,mindeep,sedimentctl,&
 		scalc,sedInterval, edgeCenterCoor, faceEdges, faceEdgeNormals,edgeLength,faceEdgesNum,&
-		gradEta,edgeQ1,faceNeighbors,faceCenters,eta,pcoor,edgePoints,binfo,calc_flag
+		gradEta,edgeQ1,Cd,faceCenters
 	implicit none
 
-	integer i, j,k
-    real*8 Sf,Sfx,Sfy,ssfx,ssfy
+	integer i
+    real*8 Sf,Sfx,Sfy,ssfx,ssfy,vfx,vfy
 	real*8 Chezy(maxfaces_),ARR
 
 	real*8 length(10),nx(10),ny(10),h(10)
 	real*8 slopeTermx,slopeTermy
-	real*8 temp
 
 !   bottom friction terms
 	ssfx=nb(curFace)**2*g*Q2(curFace)*dsqrt(Q2(curFace)**2+Q3(curFace)**2)/&
-     		(Q1(curFace)**(7.0/3.0))
+     		(Q1(curFace)**(7.0/3.0))*dsqrt(1+Sox(curFace)**2+Soy(curFace)**2)
 	ssfy=nb(curFace)**2*g*Q3(curFace)*dsqrt(Q2(curFace)**2+Q3(curFace)**2)/&
-     		(Q1(curFace)**(7.0/3.0))
-
+     		(Q1(curFace)**(7.0/3.0))*dsqrt(1+Sox(curFace)**2+Soy(curFace)**2)
+!   vegetation resistance
+    vfx=0.0
+	vfy=0.0
+if(faceCenters(curFace,1).ge.0.0.and.faceCenters(curFace,1).le.1.08)then
+	  vfx=0.5*0.01*2.8*(0.087/(3.14*0.005*0.005))*min(1.0,Q1(curFace))*Q2(curFace)*dsqrt(Q2(curFace)**2+Q3(curFace)**2)/(Q1(curFace)**2)
+      vfy=0.5*0.01*2.8*(0.087/(3.14*0.005*0.005))*min(1.0,Q1(curFace))*Q3(curFace)*dsqrt(Q2(curFace)**2+Q3(curFace)**2)/(Q1(curFace)**2)
+else
+      vfx=0.0
+      vfy=0.0
+	
+endif
 
 !   slope terms
-!	do i=1,faceEdgesNum(curFace)
-!		length(i)=edgeLength(faceEdges(curFace,i))
-!		h(i)=edgeQ1(faceEdges(curFace,i))
-!		nx(i)=faceEdgeNormals(curFace,i,1)
-!		ny(i)=faceEdgeNormals(curFace,i,2)
-!	enddo
+	do i=1,faceEdgesNum(curFace)
+		length(i)=edgeLength(faceEdges(curFace,i))
+		h(i)=edgeQ1(faceEdges(curFace,i))
+		nx(i)=faceEdgeNormals(curFace,i,1)
+		ny(i)=faceEdgeNormals(curFace,i,2)
+	enddo
 	
-!	slopeTermx=0.0
-!	slopeTermy=0.0
+	slopeTermx=0.0
+	slopeTermy=0.0
 	
-!	do i=1,faceEdgesNum(curFace)
-!		slopeTermx=slopeTermx   + 0.5*g*h(i)**2*nx(i)*length(i)
-!		slopeTermy=slopeTermy   + 0.5*g*h(i)**2*ny(i)*length(i)
-!	enddo
+	do i=1,faceEdgesNum(curFace)
+		slopeTermx=slopeTermx + 0.5*g*h(i)**2*nx(i)*length(i)
+		slopeTermy=slopeTermy + 0.5*g*h(i)**2*ny(i)*length(i)
+	enddo
 
-!	slopeTermx=slopeTermx - g*Q1(curFace)*gradEta(curFace,1)*face2DArea(curFace)
-!	slopeTermy=slopeTermy - g*Q1(curFace)*gradEta(curFace,2)*face2DArea(curFace)
+	slopeTermx=slopeTermx - g*Q1(curFace)*gradEta(curFace,1)*face2DArea(curFace)
+	slopeTermy=slopeTermy - g*Q1(curFace)*gradEta(curFace,2)*face2DArea(curFace)
+    
 
-!	HiVi2(curFace)=((Swx-ssfx)*face2DArea(curFace) + slopeTermx)
-!	HiVi3(curFace)=((Swy-ssfy)*face2DArea(curFace) + slopeTermy)
+!        ***  new full expression: slope source term is well balanced      **
 
+	HiVi2(curFace)=(Swx-ssfx-vfx)*face2DArea(curFace) + slopeTermx
+	HiVi3(curFace)=(Swy-ssfy-vfy)*face2DArea(curFace) + slopeTermy
+    
 
 !c       ***  old full expression: slope source term is not well balanced  **
-	HiVi2(curFace)=(Swx-ssfx+(g*Q1(curFace)*Sox(curFace)))*face2DArea(curFace)  
-	HiVi3(curFace)=(Swy-ssfy+(g*Q1(curFace)*Soy(curFace)))*face2DArea(curFace)   
+!	HiVi2(curFace)=(Swx-ssfx+(g*Q1(curFace)*Sox(curFace)))*face2DArea(curFace)
+!	HiVi3(curFace)=(Swy-ssfy+(g*Q1(curFace)*Soy(curFace)))*face2DArea(curFace)
 	
 	return
 	end
@@ -760,8 +760,11 @@
 	subroutine RofQi_calc
 	USE COMMON_MODULE,ONLY: maxfaces_,Rem1,Rem2,Rem3,oldRem1,oldRem2,oldRem3,&
 		FdotN1,FdotN2,FdotN3,HiVi1,HiVi2,HiVi3,curFace,t,dt,ts,td,drydeep,mindeep&
-		,Q1,Q2,Q3,sedimentctl,scalc,sedInterval
+		,Q1,Q2,Q3,sedimentctl,scalc,sedInterval,calc_flag,faceCenters
 	implicit none
+
+    real*8 Q1FN,etaFN
+	integer j
 
 	if(t.gt.0D0)then
 	  oldRem1(curFace)=Rem1(curFace)
@@ -772,15 +775,16 @@
 	Rem1(curFace)=-FdotN1(curFace)
 	Rem2(curFace)=-FdotN2(curFace)+HiVi2(curFace)
 	Rem3(curFace)=-FdotN3(curFace)+HiVi3(curFace)
-    
 
-	if(Q1(curFace)<=drydeep)then  
-		Rem2(curFace)=0
-		Rem3(curFace)=0
-		
+	
+    if(Q1(curFace)<=drydeep)then  
+		Rem2(curFace)=0.0
+		Rem3(curFace)=0.0
+
 		oldRem2(curFace)=0.0
 		oldRem3(curFace)=0.0
 	end if
+
 
 	return
 	end
@@ -802,7 +806,7 @@
 	Q0_min=min(Q0,Qnb)
 	Q0_max=max(Q0,Qnb)
 
-	if(beta<=0) then
+	if(beta<0) then
 		phi=0.0
 	else
 		if(dabs(Qedge-Q0).lt.VSMALL)then
@@ -813,7 +817,7 @@
 			r=(Q0_min-Q0)/(Qedge-Q0)
 		endif
 
-		!phi=max(min(beta*r,1.0),min(r,beta))
+!		phi=max(min(beta*r,1.0),min(r,beta))
 		phi=min(r,1.0)
 	endif
 
@@ -831,6 +835,9 @@
 
 	if(edgeMarkers(faceEdges(cc,j))/=4)then	!boundary cell
 		ghostCell=boundaryEdgeGhostCells(faceEdges(cc,j))
+
+!		print*,ghostCell,'ghostCell---1'
+
 		hFN=gh(ghostCell)
 	else                                    !internal cell
 		hFN=h(faceNeighbors(cc,j))
@@ -873,6 +880,10 @@
 
 	if(edgeMarkers(faceEdges(cc,i))/=4)then	!boundary cell
 		ghostCell=boundaryEdgeGhostCells(faceEdges(cc,i))
+
+!		print*,ghostCell,'ghostCell'
+!		pause
+
 		hFN=gh(ghostCell)
 	else
 		pos=edgePositionInFace(faceNeighbors(cc,i),faceEdges(cc,i))
@@ -902,7 +913,7 @@
 
 	err=VLARGE
 	xk=hI
-	do while(err>1E-6)   !Newton-Raphson step
+	do while(err>1E-6)   
 		fxk=xk-(1/2.0/dsqrt(g)*(uI-Q2tmp/xk)+dsqrt(hI))**2
 		fprimexk=1-Q2tmp*(dsqrt(hI)+(-Q2tmp/xk+uI)/(2*dsqrt(g)))/dsqrt(g)/xk**2
 		xkplus1=xk-fxk/fprimexk
@@ -911,7 +922,7 @@
 	end do
 	
 	qcondition_inlet=xkplus1
-
+	
 	end function qcondition_inlet
 
 
@@ -935,37 +946,37 @@
 		    Qb1av(curFace,j)=Qb1(curFace,j)
  		    u(curFace,j)=0
 			v(curFace,j)=0
-
 		else
-		    call neighbor_value2(Qb1,gQb1,curFace,j,Qb1FN)
+  		    call neighbor_value2(Qb1,gQb1,curFace,j,Qb1FN)
 		    call neighbor_value2(Qb2,gQb2,curFace,j,Qb2FN)
 		    call neighbor_value2(Qb3,gQb3,curFace,j,Qb3FN)
 	
   		    if(Qb1(curFace,j)<=mindeep)then
-		        h1=0
+		        h1=0+mindeep
 	        else
 			    h1=dsqrt(Qb1(curFace,j))
 	        end if
 	
 	        if(Qb1FN<=mindeep)then
-			    h2=0
+			    h2=0+mindeep
 	        else
 			    h2=dsqrt(Qb1FN)
 		    end if
 	
 		    bottom=h1+h2
-		    Qb1av(curFace,j)=0.5D0*(Qb1(curFace,j)+Qb1FN)                             
+		    Qb1av(curFace,j)=0.5D0*(Qb1(curFace,j)+Qb1FN)   
+									                          
 		    if(Qb1(curFace,j)<=mindeep.and.Qb1FN<=mindeep)then
 			    u(curFace,j)=0
 			    v(curFace,j)=0
-			else if(Qb1(curFace,j)<=mindeep.and.Qb1FN>=mindeep)then		 
+		    else if(Qb1(curFace,j)<=mindeep.and.Qb1FN>mindeep)then		 
 			    u(curFace,j)=Qb2FN/Qb1FN
 			    v(curFace,j)=Qb3FN/Qb1FN
-		    else if(Qb1FN<=mindeep.and.Qb1(curFace,j)>=mindeep)then		
+		    else if(Qb1FN<=mindeep.and.Qb1(curFace,j)>mindeep)then		
 			    u(curFace,j)=Qb2(curFace,j)/Qb1(curFace,j)
 			    v(curFace,j)=Qb3(curFace,j)/Qb1(curFace,j)
 		    else
-			    u(curFace,j)=(Qb2(curFace,j)/Qb1(curFace,j)*h1+Qb2FN/Qb1FN*h2)/bottom
+		        u(curFace,j)=(Qb2(curFace,j)/Qb1(curFace,j)*h1+Qb2FN/Qb1FN*h2)/bottom
 			    v(curFace,j)=(Qb3(curFace,j)/Qb1(curFace,j)*h1+Qb3FN/Qb1FN*h2)/bottom
 		    end if
 		end if
@@ -1001,7 +1012,49 @@
 	return
 	end
 !c
-!c***************************************************************
+!***************************************************************
+	subroutine lambda_change
+	USE COMMON_MODULE,ONLY: Qb1av,Qb1,Qb2,Qb3,g,Q1,Q2,Q3,&
+		lambda1,lambda2,lambda3,curFace,modA,R,modLAMBDA,L,faceEdgeNormals,&
+		u,v,alpha,drydeep,mindeep,edgeCenterCoor,faceEdges,faceEdgesNum,dt,&
+        gQb1,gQb2,gQb3,edgeLength,pcoor,edgePoints
+	implicit none
+	
+	integer j
+	real*8 tolvalue
+    real*8 tempL,tempR
+    real*8 lambdaL2,lambdaR2,lambdaL3,lambdaR3
+    real(8):: Qb1FN,QB2FN,Qb3FN
+
+	do j=1,faceEdgesNum(curFace)
+	tolvalue=0.1*dabs(pcoor(edgePoints(faceEdges(curFace, j),1), 1)-pcoor(edgePoints(faceEdges(curFace, j),2), 1))/dt
+  	
+	call neighbor_value2(Qb1,gQb1,curFace,j,Qb1FN)
+    call neighbor_value2(Qb2,gQb2,curFace,j,Qb2FN)
+	call neighbor_value2(Qb3,gQb3,curFace,j,Qb3FN)
+    
+	tempL=(Qb2(curFace,j)/Qb1(curFace,j))*faceEdgeNormals(curFace,j,1)+(Qb3(curFace,j)/Qb1(curFace,j))*faceEdgeNormals(curFace,j,2)    
+	tempR=(Qb2FN/Qb1FN)*faceEdgeNormals(curFace,j,1)+(Qb3FN/Qb1FN)*faceEdgeNormals(curFace,j,2)
+
+    lambdaL2=tempL-Qb1(curFace,j)
+    lambdaR2=0.25*(tempL+3*tempR)+0.5*(Qb1(curFace,j)-3.0*Qb1FN)
+
+    lambdaL3=0.25*(tempL+3*tempR)+0.5*(Qb1(curFace,j)-3.0*Qb1FN)
+    lambdaR3=tempR+Qb1FN
+	
+	if(dabs(lambda2(curFace,j))<=tolvalue)then
+		lambda2(curFace,j)=lambda2(curFace,j)*((lambdaR2-lambda2(curFace,j))/(lambdaR2-lambdaL2))
+	endif
+	if(dabs(lambda3(curFace,j))<=tolvalue)then
+	    lambda3(curFace,j)=lambda3(curFace,j)*((lambdaR3-lambda3(curFace,j))/(lambdaR3-lambdaL3))
+	endif
+
+	end do
+
+	return
+	end
+!c***********************************************************************
+
 !c  The subroutine calculates the right eigenvector matrix of the 
 !c  flux jacobian A
 	subroutine R_calc
@@ -1105,6 +1158,7 @@
 
 	return
 	end
+
 !c********************************************************
 !c  This subroutine calculates the intercell flux based on 
 !c  Roe's flux funtion
@@ -1143,13 +1197,13 @@
 		call neighbor_value2(Qb2,gQb2,curFace,j,Qb2FN)
 		call neighbor_value2(Qb3,gQb3,curFace,j,Qb3FN)
 		
-		dQ(1)=Qb1FN-Qb1(curFace,j)      !Q R-L
+		dQ(1)=Qb1FN-Qb1(curFace,j)      
 		dQ(2)=Qb2FN-Qb2(curFace,j)
 		dQ(3)=Qb3FN-Qb3(curFace,j)
 		
 		do k=1,3
 			do a=1,3
-				tempmodA(k,a)=modA(curFace,j,k,a)   !/A/
+				tempmodA(k,a)=modA(curFace,j,k,a)   
 			end do
 		end do
 
@@ -1157,11 +1211,12 @@
 
 		!the signs infront of FIofQb1FN, FIofQb1FN, FIofQb1FN are negative
 		!since the normal vector is the negative for the current edge j with
-		!respect to each neighboring face
+		!respect to each neighboring  
 		FI1(curFace,j)=0.5D0*(-FIofQb1FN+FIofQb1(curFace,j)-result(1))
 		FI2(curFace,j)=0.5D0*(-FIofQb2FN+FIofQb2(curFace,j)-result(2))
 		FI3(curFace,j)=0.5D0*(-FIofQb3FN+FIofQb3(curFace,j)-result(3))
- 
+        
+!---------------------------------------
 
 
         curEdge = faceEdges(curFace, j)
@@ -1208,7 +1263,65 @@
 !	Interpolate cell center values to node values
 	subroutine cellCenterToNodes(cellValues,nodeValues)
 	USE COMMON_MODULE,ONLY: faceCenters,nNodes,pointFaces,maxfaces_,maxnodes_,&
-							pointNFaces,pcoor,maxnodefaces_,facePoints,VSMALL
+							pointNFaces,pcoor,maxnodefaces_,facePoints,VSMALL,&
+							Q1,drydeep,calc_flag
+	implicit none
+
+	real(8) cellValues(maxfaces_), nodeValues(maxnodes_)
+	real*8 dtemp1,dtemp2,temp
+	real*8 v1(3),v2(3),c1(3)
+	integer i,j
+
+    do i = 1, nNodes                  
+         !temp variables for inverse distance weigh
+         dtemp1 = 0.0
+         dtemp2 = 0.0
+
+         !current node coordinates
+         v1(1) = pcoor(i,1)
+         v1(2) = pcoor(i,2)
+         v1(3) = pcoor(i,3)
+         
+         do j =1, pointNFaces(i)         
+            if(pointFaces(i, j).ne.-1) then
+
+                c1(1) = 1.0/3.0*(pcoor(facePoints(pointFaces(i,j),1),1)+&
+                                pcoor(facePoints(pointFaces(i,j),2),1)+ &
+                                pcoor(facePoints(pointFaces(i,j),3),1))
+                c1(2) = 1.0/3.0*(pcoor(facePoints(pointFaces(i,j),1),2)+ &
+                                pcoor(facePoints(pointFaces(i,j),2),2)+  &
+                                pcoor(facePoints(pointFaces(i,j),3),2))
+                c1(3) = 1.0/3.0*(pcoor(facePoints(pointFaces(i,j),1),3)+ &
+                                pcoor(facePoints(pointFaces(i,j),2),3)+  &
+                                pcoor(facePoints(pointFaces(i,j),3),3))
+
+                !distance vector from current node to face center
+                v2(1) = v1(1) - c1(1)  
+                v2(2) = v1(2) - c1(2)  
+                v2(3) = v1(3) - c1(3)  
+                
+                !distance between current node and face center
+                call vec_mag(v2, temp)
+                dtemp1 = dtemp1 + cellValues(pointFaces(i,j))/temp
+                dtemp2 = dtemp2 + 1.0/temp               
+               end if
+
+         end do 
+         
+		 if(dabs(dtemp2).gt.VSMALL)then
+			nodeValues(i) = dtemp1/dtemp2
+		 else
+		    nodeValues(i) = 0.0
+		 end if
+    end do
+
+	end subroutine	
+!------------------------------------------------------------
+!	Interpolate cell center values to node values
+	subroutine cellCenterToNodes2(cellValues,nodeValues)
+	USE COMMON_MODULE,ONLY: faceCenters,nNodes,pointFaces,maxfaces_,maxnodes_,&
+							pointNFaces,pcoor,maxnodefaces_,facePoints,VSMALL,&
+							Q1,drydeep,calc_flag
 	implicit none
 
 	real(8) cellValues(maxfaces_), nodeValues(maxnodes_)
@@ -1227,7 +1340,9 @@
          v1(3) = pcoor(i,3)
          
          do j =1, pointNFaces(i)
-            if(pointFaces(i, j).ne.-1) then
+        if(pointFaces(i, j).ne.-1) then
+
+		   if(calc_flag(pointFaces(i,j))==1)then                                
                 !current face center coordinates
                 c1(1) = 1.0/3.0*(pcoor(facePoints(pointFaces(i,j),1),1)+&
                                 pcoor(facePoints(pointFaces(i,j),2),1)+ &
@@ -1248,7 +1363,35 @@
                 call vec_mag(v2, temp)
                 dtemp1 = dtemp1 + cellValues(pointFaces(i,j))/temp
                 dtemp2 = dtemp2 + 1.0/temp               
-            end if
+		   else
+              if(calc_flag(pointFaces(i,j))==2)then
+			     if(Q1(pointFaces(i,j))>drydeep)then
+                  c1(1) = 1.0/3.0*(pcoor(facePoints(pointFaces(i,j),1),1)+&
+                                pcoor(facePoints(pointFaces(i,j),2),1)+ &
+                                pcoor(facePoints(pointFaces(i,j),3),1))
+                  c1(2) = 1.0/3.0*(pcoor(facePoints(pointFaces(i,j),1),2)+ &
+                                pcoor(facePoints(pointFaces(i,j),2),2)+  &
+                                pcoor(facePoints(pointFaces(i,j),3),2))
+                  c1(3) = 1.0/3.0*(pcoor(facePoints(pointFaces(i,j),1),3)+ &
+                                pcoor(facePoints(pointFaces(i,j),2),3)+  &
+                                pcoor(facePoints(pointFaces(i,j),3),3))
+
+                !distance vector from current node to face center
+                   v2(1) = v1(1) - c1(1)  
+                   v2(2) = v1(2) - c1(2)  
+                   v2(3) = v1(3) - c1(3)  
+                
+                !distance between current node and face center
+                   call vec_mag(v2, temp)
+                   dtemp1 = dtemp1 + cellValues(pointFaces(i,j))/temp
+                   dtemp2 = dtemp2 + 1.0/temp 
+				  else
+				   dtemp1 = dtemp1 + cellValues(pointFaces(i,j))
+                   dtemp2 = dtemp2 + 1.0             
+		          endif
+			  endif
+		    endif
+			endif
          end do 
          
 		 if(dabs(dtemp2).gt.VSMALL)then
@@ -1259,36 +1402,41 @@
     end do
 
 	end subroutine	
-	
+
+
+!---------------------------------------------------------------	
 
 !   calculate the mean value of H, U, V in the domain
 	subroutine meanHUV
-	USE COMMON_MODULE,ONLY: nNodes,nodeQ1,nodeU,nodeV,meanH,meanU,meanV
+	USE COMMON_MODULE,ONLY: nNodes,nodeQ1,nodeU,nodeV,nodecsed,meanH,meanU,meanV,meanC
 	implicit none
 
-	real*8 dHtemp,dUtemp,dVtemp
+	real*8 dHtemp,dUtemp,dVtemp,dCtemp
 	integer i
 
-    dHtemp = 0.0
+     dHtemp = 0.0
     dUtemp = 0.0
     dVtemp = 0.0
- 
+    dCtemp = 0.0
     do i = 1, nNodes
 		dHtemp=dHtemp+nodeQ1(i)
 		dUtemp=dUtemp+nodeU(i)
-		dVtemp=dVtemp+nodeV(i)              
+		dVtemp=dVtemp+nodeV(i)  
+		dCtemp=dCtemp+nodecsed(i)         
 	end do
 
 	meanH = dHtemp/nNodes
 	meanU = dUtemp/nNodes
 	meanV = dVtemp/nNodes
+    meanC = dCtemp/nNodes
 
 	end subroutine
 
 !	calculate the gradient of Q at the cell centers using Gauss's theorem
 	subroutine gradientQ
 	USE COMMON_MODULE,ONLY: nFaces,nNodes,nodeQ1,nodeQ2,nodeQ3,gradQ1,gradQ2,gradQ3,&
-							faceEdgeNormals,faceEdges,face2DArea,edgeLength,edgePoints,faceEdgesNum
+							faceEdgeNormals,faceEdges,face2DArea,edgeLength,edgePoints,&
+							faceEdgesNum,CALC_FLAG,Q1,drydeep
 	implicit none
 
 	integer i,j
@@ -1300,6 +1448,7 @@
 	gradQ3=0.0
 
 	do i = 1, nFaces
+	 if(Q1(i)>drydeep)then
 	   do j = 1, faceEdgesNum(i)	    
 		temp=(nodeQ1(edgePoints(faceEdges(i,j),1))+nodeQ1(edgePoints(faceEdges(i,j),2)))/2* &
 		     faceEdgeNormals(i,j,1)*edgeLength(faceEdges(i,j))
@@ -1325,6 +1474,7 @@
 		     faceEdgeNormals(i,j,2)*edgeLength(faceEdges(i,j))
 		gradQ3(i,2)=gradQ3(i,2)+1.0/face2DArea(i)*temp
 	   end do
+	 endif
 	end do
 
 	end subroutine
@@ -1332,7 +1482,8 @@
 !	calculate the gradient of u and v at the cell centers using Gauss's theorem
 	subroutine gradientUV
 	USE COMMON_MODULE,ONLY: nFaces,nNodes,nodeU,nodeV,gradU,gradV,faceEdgesNum,&
-							faceEdgeNormals,faceEdges,face2DArea,edgeLength,edgePoints
+							faceEdgeNormals,faceEdges,face2DArea,edgeLength,&
+							edgePoints,CALC_FLAG,Q1,drydeep
 	implicit none
 
 	integer i,j
@@ -1343,6 +1494,7 @@
 	gradV=0.0
 
 	do i = 1, nFaces
+	 if(Q1(i)>drydeep)then
 	   do j = 1, faceEdgesNum(i)	    
 		temp=(nodeU(edgePoints(faceEdges(i,j),1))+nodeU(edgePoints(faceEdges(i,j),2)))/2* &
 		     faceEdgeNormals(i,j,1)*edgeLength(faceEdges(i,j))
@@ -1360,6 +1512,7 @@
 		     faceEdgeNormals(i,j,2)*edgeLength(faceEdges(i,j))
 		gradV(i,2)=gradV(i,2)+1.0/face2DArea(i)*temp
 	   end do
+	 endif
 	end do
 
 	end subroutine
@@ -1368,35 +1521,54 @@
 	subroutine gradientEta
 	USE COMMON_MODULE,ONLY: nFaces,nNodes,nodeZsurf,gradEta,faceEdgesNum,&
 							faceEdgeNormals,faceEdges,face2DArea,edgeLength,edgePoints,&
-							t,aa,nDEMPoints,wse,BINFO,faceCenters,eta,Q1,nodeQ1,drydeep,&
-                            geta,gQ1
+							t,BINFO,faceCenters,eta,Q1,nodeQ1,drydeep,&
+                            geta,gQ1,calc_flag,pcoor,aa,nDEMPoints,wse
 	implicit none
 
 	integer i,j
 	integer node1,node2,node3
-	real*8 temp,hB1
+	integer tindex
+	real*8 temp,hB1	
 	real*8 waterlevel
 	real*8 Q1FN,Q2FN,Q3FN,EtaFN
 
-	gradEta=0.0
+		gradEta=0.0
 
-	do i = 1, nFaces
-	   do j = 1, faceEdgesNum(i)
- 
-
-		 temp=(nodeZsurf(edgePoints(faceEdges(i,j),1))+nodeZsurf(edgePoints(faceEdges(i,j),2)))/2* &
-		     faceEdgeNormals(i,j,1)*edgeLength(faceEdges(i,j))
+do i = 1, nFaces
+  do j = 1, faceEdgesNum(i)
+	   
+	 if(binfo(i,j)==2)then       
+   	    
+  	     
+         do aa=1,nDEMPoints-1
+            if((wse(aa,1).le.t).and.(t.lt.wse(aa+1,1)))then
+               waterlevel=wse(aa,2)+(wse(aa+1,2)-wse(aa,2))/(wse(aa+1,1)-wse(aa,1))*(t-wse(aa,1))
+            endif
+		 enddo
+	     
+	     hB1=waterlevel+0.12
+		 temp=(hB1*faceEdgeNormals(i,j,1)*edgeLength(faceEdges(i,j)))
 		 gradEta(i,1)=gradEta(i,1)+1.0/face2DArea(i)*temp
 	
-		 temp=(nodeZsurf(edgePoints(faceEdges(i,j),1))+nodeZsurf(edgePoints(faceEdges(i,j),2)))/2* &
-		     faceEdgeNormals(i,j,2)*edgeLength(faceEdges(i,j))
-		 gradEta(i,2)=gradEta(i,2)+1.0/face2DArea(i)*temp       
-		   
+		 temp=(hB1*faceEdgeNormals(i,j,2)*edgeLength(faceEdges(i,j)))
+		 gradEta(i,2)=gradEta(i,2)+1.0/face2DArea(i)*temp
+	   
+	   else
+
+		 	temp=(nodeZsurf(edgePoints(faceEdges(i,j),1))+nodeZsurf(edgePoints(faceEdges(i,j),2)))/2* &
+		           faceEdgeNormals(i,j,1)*edgeLength(faceEdges(i,j))
+		     gradEta(i,1)=gradEta(i,1)+1.0/face2DArea(i)*temp
 	
-	   end do
+		     temp=(nodeZsurf(edgePoints(faceEdges(i,j),1))+nodeZsurf(edgePoints(faceEdges(i,j),2)))/2* &
+		           faceEdgeNormals(i,j,2)*edgeLength(faceEdges(i,j))
+		     gradEta(i,2)=gradEta(i,2)+1.0/face2DArea(i)*temp
+      	endif
+	 end do
 	end do
 
 	end subroutine
+
+!----------------------------------------------------------
 
 !   calculate the edge gradient of u and v by the area weighted average
 !   of neighbour triangles
@@ -1431,6 +1603,8 @@
 	end subroutine
 
 
+!------------------------------------
+
 !   calculate the edge water depth (Q1)
 	subroutine calc_edgeQ1
 	USE COMMON_MODULE,ONLY: nEdges,edgeFaces,face2DArea,edgeQ1,Q1,Qb1
@@ -1456,7 +1630,7 @@
 			faceArea2=face2DArea(face2)
 			pos1=edgePositionInFace(face1,i)
 			pos2=edgePositionInFace(face2,i)
-			edgeQ1(i)=(Qb1(face1,pos1)+Qb1(face2,pos2))/2   !(Q1(face1)*faceArea1+Q1(face2)*faceArea2)/(faceArea1+faceArea2)
+			edgeQ1(i)=(Qb1(face1,pos1)+Qb1(face2,pos2))/2 !(Q1(face1)*faceArea1+Q1(face2)*faceArea2)/(faceArea1+faceArea2)
 		end if
 	end do
 
@@ -1467,7 +1641,7 @@
 	subroutine calc_faceLimiters
 	USE COMMON_MODULE,ONLY: nFaces,edgeFaces,faceLimiters,gradQ1,gradQ2,gradQ3,Q1,&
 							Q2,Q3,faceEdges,faceCenters,VLARGE,gQ1,gQ2,gQ3,faceEdgesNum,&
-							edgeCenterCoor,etaLimiter,eta,gEta,gradEta
+							edgeCenterCoor,etaLimiter,eta,gEta,gradEta,CALC_FLAG,drydeep
 	implicit none
 
 	real*8 rtemp(3), gradTemp(3), Qedge, temp, phi(3), phimax(3), phimaxEta,phiEta
@@ -1478,6 +1652,7 @@
 		phi=0.0
 		phimax=VLARGE
 		phimaxEta=VLARGE
+	 if(Q1(i)>drydeep)then
 		do j=1,faceEdgesNum(i)
 			call neighbor_value(eta,gEta,i,j,EtaFN)
 			call neighbor_value(Q1,gQ1,i,j,Q1FN)
@@ -1549,6 +1724,7 @@
 		faceLimiters(i,1)=max(0.0,phimax(1))
 		faceLimiters(i,2)=max(0.0,phimax(2))
 		faceLimiters(i,3)=max(0.0,phimax(3))
+	 endif
 	end do
 	
 	end subroutine
@@ -1595,14 +1771,11 @@
 
 	end subroutine
 
-!***********************************************************************
-
-
 
 !   calculate the edge water depth (Q1)
 	subroutine wetdry_edge
 	USE COMMON_MODULE,ONLY: nEdges,edgeFaces,face2DArea,edgeQ1,Q1,Qb1,edgedrywet,&
-	                        drydeep,eta,edgeCenterCoor
+	                        drydeep,eta
 	implicit none
 
 	integer i,pos1,pos2
@@ -1634,14 +1807,12 @@
 
 		   elseif(Q1(face1).gt.drydeep.and.Q1(face2).le.drydeep)then
 		       if(eta(face1).gt.eta(face2))then
-
                   edgedrywet(i)=1
 			   else
                   edgedrywet(i)=0
 			   endif
 		   elseif(Q1(face1).le.drydeep.and.Q1(face2).gt.drydeep)then
 		       if(eta(face1).lt.eta(face2))then
-
                   edgedrywet(i)=1
 			   else
                   edgedrywet(i)=0
@@ -1691,8 +1862,8 @@
 
 !*********************************************
 	subroutine change_z
-	USE COMMON_MODULE,ONLY: nEdges,nodeQ1,nodeQ2,nodeQ3,Q1,Qb1,edgedrywet,&
-	                        drydeep,eta,pcoor,nodeZsurf,nNodes,pcoortemp
+	USE COMMON_MODULE,ONLY: nEdges,edgeFaces,face2DArea,edgeQ1,Q1,Qb1,edgedrywet,&
+	                        drydeep,eta,pcoor,nodeZsurf,nNodes
 	implicit none
 
 	integer i,pos1,pos2
@@ -1701,14 +1872,11 @@
 	integer edgePositionInFace
 
 	do i=1,nNodes
-       pcoortemp(i,1)=pcoor(i,1)
-	   pcoortemp(i,2)=pcoor(i,2)
-	   pcoortemp(i,3)=pcoor(i,3)
 	   if(pcoor(i,3).gt.nodeZsurf(i))then
-		   pcoortemp(i,3)=nodeZsurf(i)
-		 
+		   pcoor(i,3)=nodeZsurf(i)
 	   endif
 	enddo 
 
 
 	end subroutine
+
