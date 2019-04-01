@@ -1,30 +1,6 @@
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    HydroSed2D Copyright (C) 2008 Xiaofeng Liu
-!
-!    License
-!
-!    This file is part of HydroSed2D.
-!
-!    HydroSed2D is free software: you can redistribute it and/or modify
-!    it under the terms of the GNU General Public License as published by
-!    the Free Software Foundation, either version 3 of the License, or
-!    (at your option) any later version.
-!
-!    HydroSed2D is distributed in the hope that it will be useful,
-!    but WITHOUT ANY WARRANTY; without even the implied warranty of
-!    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-!    GNU General Public License for more details.
-!
-!    You should have received a copy of the GNU General Public License
-!    along with HydroSed2D.  If not, see <http://www.gnu.org/licenses/>.
-!
-!    Base on HydroSed2D, Mingliang Zhang and Hongxing Zhang further developed the depth-averaged 2D hydrodynamic model 
-!    by introducing treatment technology of wet-dry boundary and considering vegetation effects. 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+c Aux functions 
 
-! Aux subroutines 
-
-!     vector dot product C = A & B
+c     vector dot product C = A & B
       subroutine vec_dot(A, B, C)
          implicit none
          real*8 A(3), B(3), C
@@ -37,7 +13,7 @@
          return
       end
 
-!     vector cross product C = AXB
+c     vector cross product C = AXB
       subroutine vec_cross(A, B, C)
          implicit none
          real*8 A(3), B(3), C(3)
@@ -48,7 +24,7 @@
          return
       end
 
-!     vector normaliztion
+c     vector normaliztion
       subroutine vec_normalize(A)
          implicit none
          real*8 A(3), temp
@@ -66,7 +42,7 @@
          return
       end
 
-!     vector magnitude
+c     vector magnitude
       subroutine vec_mag(A, C)
          implicit none
          real*8 A(3), C
@@ -77,8 +53,17 @@
          return
        end
        
+c      triangle face area
+       subroutine triangle_area(A, B, C, area)
+          implicit none
+          real*8 A(3), B(3), C(3), area
 
-!      ascending order of 3 integer numbers
+          !not implemented yet
+          area = 0.0
+          return
+       end
+
+c      ascending order of N integer numbers
        subroutine orderThreeInt(A, B, C)
           implicit none
           integer*4 A, B, C, temp1, temp2, temp3
